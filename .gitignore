@@ -22,3 +22,9 @@ build/
 *~
 lib/
 
+# build folder for QtCreator
+build-Default
+build-Debug
+build-Release
+build-Release with Debug Information
+
