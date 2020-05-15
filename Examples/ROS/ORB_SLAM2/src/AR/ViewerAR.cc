@@ -19,13 +19,10 @@
 */
 
 #include "ViewerAR.h"
-
 #include <opencv2/highgui/highgui.hpp>
-
 #include <mutex>
 #include <thread>
 #include <cstdlib>
-
 using namespace std;
 
 namespace ORB_SLAM2
