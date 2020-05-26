@@ -55,7 +55,7 @@ class KeyFrameDatabase {
     const ORBVocabulary* mpVoc;
 
     // Inverted file
-    std::vector<list<KeyFrame*> > mvInvertedFile;
+    std::vector<list<KeyFrame*>> mvInvertedFile;
 
     // Mutex
     std::mutex mMutex;

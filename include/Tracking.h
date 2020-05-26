@@ -147,7 +147,7 @@ class Tracking {
     ORBVocabulary* mpORBVocabulary;
     KeyFrameDatabase* mpKeyFrameDB;
 
-    // Initalization (only for monocular)
+    // Initialization (only for monocular)
     Initializer* mpInitializer;
 
     // Local Map
@@ -169,7 +169,7 @@ class Tracking {
     // Calibration matrix
     cv::Mat mK;
     cv::Mat mDistCoef;
-    float mbf;
+    float mbf;  // IR projector basedline times fx, used for RGBD
 
     // New KeyFrame rules (according to fps)
     int mMinFrames;

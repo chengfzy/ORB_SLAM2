@@ -18,6 +18,8 @@
  * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <fmt/format.h>
+#include <glog/logging.h>
 #include <unistd.h>
 #include <algorithm>
 #include <chrono>
@@ -26,43 +28,76 @@
 #include <iostream>
 #include <opencv2/core/core.hpp>
 #include "System.h"
-using namespace std;
 
-void LoadImages(const string& strSequence, vector<string>& vstrImageFilenames, vector<double>& vTimestamps);
+using namespace std;
+using namespace fmt;
+
+void LoadImages(const string& pathToSequence, vector<string>& imageFilenames, vector<double>& timestamps) {
+    LOG(INFO) << format("Load images from KITTI folder {}", pathToSequence);
+
+    // read timestamp
+    ifstream fTimes;
+    string strPathTimeFile = pathToSequence + "/times.txt";
+    fTimes.open(strPathTimeFile.c_str());
+    while (!fTimes.eof()) {
+        string s;
+        getline(fTimes, s);
+        if (!s.empty()) {
+            stringstream ss;
+            ss << s;
+            double t;
+            ss >> t;
+            timestamps.push_back(t);
+        }
+    }
+
+    // parse image files
+    string strPrefixLeft = pathToSequence + "/image_0/";
+    const int nTimes = timestamps.size();
+    imageFilenames.resize(nTimes);
+    for (int i = 0; i < nTimes; ++i) {
+        stringstream ss;
+        ss << setfill('0') << setw(6) << i;
+        imageFilenames[i] = strPrefixLeft + ss.str() + ".png";
+    }
+}
 
 int main(int argc, char** argv) {
+    google::InitGoogleLogging(argv[0]);
+    FLAGS_alsologtostderr = true;
+
     if (argc != 4) {
         cerr << endl << "Usage: ./mono_kitti path_to_vocabulary path_to_settings path_to_sequence" << endl;
         return 1;
     }
 
     // Retrieve paths to images
-    vector<string> vstrImageFilenames;
-    vector<double> vTimestamps;
-    LoadImages(string(argv[3]), vstrImageFilenames, vTimestamps);
+    vector<string> imageFilenames;
+    vector<double> timestamps;
+    LoadImages(string(argv[3]), imageFilenames, timestamps);
 
-    int nImages = vstrImageFilenames.size();
+    const size_t kImageNum = imageFilenames.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1], argv[2], ORB_SLAM2::System::MONOCULAR, true);
 
     // Vector for tracking time statistics
-    vector<float> vTimesTrack;
-    vTimesTrack.resize(nImages);
+    vector<float> timesTrack;
+    timesTrack.resize(kImageNum);
 
     cout << endl << "-------" << endl;
     cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;
+    cout << format("Images in the sequence: {}", kImageNum) << endl << endl;
 
     // Main loop
     cv::Mat im;
-    for (int ni = 0; ni < nImages; ni++) {
+    for (size_t n = 0; n < kImageNum; ++n) {
         // Read image from file
-        im = cv::imread(vstrImageFilenames[ni], CV_LOAD_IMAGE_UNCHANGED);
-        double tframe = vTimestamps[ni];
+        im = cv::imread(imageFilenames[n], cv::IMREAD_UNCHANGED);
+        double tframe = timestamps[n];
 
         if (im.empty()) {
-            cerr << endl << "Failed to load image at: " << vstrImageFilenames[ni] << endl;
+            cerr << endl << "Failed to load image at: " << imageFilenames[n] << endl;
             return 1;
         }
 
@@ -83,14 +118,14 @@ int main(int argc, char** argv) {
 
         double ttrack = std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
 
-        vTimesTrack[ni] = ttrack;
+        timesTrack[n] = ttrack;
 
         // Wait to load the next frame
         double T = 0;
-        if (ni < nImages - 1)
-            T = vTimestamps[ni + 1] - tframe;
-        else if (ni > 0)
-            T = tframe - vTimestamps[ni - 1];
+        if (n < kImageNum - 1)
+            T = timestamps[n + 1] - tframe;
+        else if (n > 0)
+            T = tframe - timestamps[n - 1];
 
         if (ttrack < T) usleep((T - ttrack) * 1e6);
     }
@@ -99,45 +134,18 @@ int main(int argc, char** argv) {
     SLAM.Shutdown();
 
     // Tracking time statistics
-    sort(vTimesTrack.begin(), vTimesTrack.end());
+    sort(timesTrack.begin(), timesTrack.end());
     float totaltime = 0;
-    for (int ni = 0; ni < nImages; ni++) {
-        totaltime += vTimesTrack[ni];
+    for (size_t n = 0; n < kImageNum; ++n) {
+        totaltime += timesTrack[n];
     }
     cout << "-------" << endl << endl;
-    cout << "median tracking time: " << vTimesTrack[nImages / 2] << endl;
-    cout << "mean tracking time: " << totaltime / nImages << endl;
+    cout << format("median tracking time: {}", timesTrack[kImageNum / 2]) << endl;
+    cout << format("mean tracking time: {}", totaltime / kImageNum) << endl;
 
     // Save camera trajectory
     SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
 
+    google::ShutdownGoogleLogging();
     return 0;
-}
-
-void LoadImages(const string& strPathToSequence, vector<string>& vstrImageFilenames, vector<double>& vTimestamps) {
-    ifstream fTimes;
-    string strPathTimeFile = strPathToSequence + "/times.txt";
-    fTimes.open(strPathTimeFile.c_str());
-    while (!fTimes.eof()) {
-        string s;
-        getline(fTimes, s);
-        if (!s.empty()) {
-            stringstream ss;
-            ss << s;
-            double t;
-            ss >> t;
-            vTimestamps.push_back(t);
-        }
-    }
-
-    string strPrefixLeft = strPathToSequence + "/image_0/";
-
-    const int nTimes = vTimestamps.size();
-    vstrImageFilenames.resize(nTimes);
-
-    for (int i = 0; i < nTimes; i++) {
-        stringstream ss;
-        ss << setfill('0') << setw(6) << i;
-        vstrImageFilenames[i] = strPrefixLeft + ss.str() + ".png";
-    }
 }

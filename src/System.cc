@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <thread>
 #include "Converter.h"
+
 namespace ORB_SLAM2 {
 
 System::System(const string& strVocFile, const string& strSettingsFile, const eSensor sensor, const bool bUseViewer)

@@ -43,7 +43,7 @@ Frame::Frame(const Frame& frame)
       mbf(frame.mbf),
       mb(frame.mb),
       mThDepth(frame.mThDepth),
-      N(frame.N),
+      keyPointNum(frame.keyPointNum),
       mvKeys(frame.mvKeys),
       mvKeysRight(frame.mvKeysRight),
       mvKeysUn(frame.mvKeysUn),
@@ -100,7 +100,7 @@ Frame::Frame(const cv::Mat& imLeft, const cv::Mat& imRight, const double& timeSt
     threadLeft.join();
     threadRight.join();
 
-    N = mvKeys.size();
+    keyPointNum = mvKeys.size();
 
     if (mvKeys.empty()) return;
 
@@ -108,8 +108,8 @@ Frame::Frame(const cv::Mat& imLeft, const cv::Mat& imRight, const double& timeSt
 
     ComputeStereoMatches();
 
-    mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
-    mvbOutlier = vector<bool>(N, false);
+    mvpMapPoints = vector<MapPoint*>(keyPointNum, static_cast<MapPoint*>(NULL));
+    mvbOutlier = vector<bool>(keyPointNum, false);
 
     // This is done only for the first Frame (or after a change in the calibration)
     if (mbInitialComputations) {
@@ -158,7 +158,7 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& imDepth, const double& timeSt
     // ORB extraction
     ExtractORB(0, imGray);
 
-    N = mvKeys.size();
+    keyPointNum = mvKeys.size();
 
     if (mvKeys.empty()) return;
 
@@ -166,8 +166,8 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& imDepth, const double& timeSt
 
     ComputeStereoFromRGBD(imDepth);
 
-    mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
-    mvbOutlier = vector<bool>(N, false);
+    mvpMapPoints = vector<MapPoint*>(keyPointNum, static_cast<MapPoint*>(NULL));
+    mvbOutlier = vector<bool>(keyPointNum, false);
 
     // This is done only for the first Frame (or after a change in the calibration)
     if (mbInitialComputations) {
@@ -216,18 +216,18 @@ Frame::Frame(const cv::Mat& imGray, const double& timeStamp, ORBextractor* extra
     // ORB extraction
     ExtractORB(0, imGray);
 
-    N = mvKeys.size();
+    keyPointNum = mvKeys.size();
 
     if (mvKeys.empty()) return;
 
     UndistortKeyPoints();
 
     // Set no stereo information
-    mvuRight = vector<float>(N, -1);
-    mvDepth = vector<float>(N, -1);
+    mvuRight = vector<float>(keyPointNum, -1);
+    mvDepth = vector<float>(keyPointNum, -1);
 
-    mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
-    mvbOutlier = vector<bool>(N, false);
+    mvpMapPoints = vector<MapPoint*>(keyPointNum, static_cast<MapPoint*>(NULL));
+    mvbOutlier = vector<bool>(keyPointNum, false);
 
     // This is done only for the first Frame (or after a change in the calibration)
     if (mbInitialComputations) {
@@ -251,19 +251,26 @@ Frame::Frame(const cv::Mat& imGray, const double& timeStamp, ORBextractor* extra
     AssignFeaturesToGrid();
 }
 
+// Assign keypoints to the grid for speed up feature matching (called in the constructor).
 void Frame::AssignFeaturesToGrid() {
-    int nReserve = 0.5f * N / (FRAME_GRID_COLS * FRAME_GRID_ROWS);
-    for (unsigned int i = 0; i < FRAME_GRID_COLS; i++)
-        for (unsigned int j = 0; j < FRAME_GRID_ROWS; j++) mGrid[i][j].reserve(nReserve);
+    int nReserve = 0.5f * keyPointNum / (FRAME_GRID_COLS * FRAME_GRID_ROWS);
+    for (unsigned int i = 0; i < FRAME_GRID_COLS; i++) {
+        for (unsigned int j = 0; j < FRAME_GRID_ROWS; j++) {
+            mGrid[i][j].reserve(nReserve);
+        }
+    }
 
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < keyPointNum; i++) {
         const cv::KeyPoint& kp = mvKeysUn[i];
 
         int nGridPosX, nGridPosY;
-        if (PosInGrid(kp, nGridPosX, nGridPosY)) mGrid[nGridPosX][nGridPosY].push_back(i);
+        if (PosInGrid(kp, nGridPosX, nGridPosY)) {
+            mGrid[nGridPosX][nGridPosY].push_back(i);
+        }
     }
 }
 
+// Extract ORB on the image. 0 for left image and 1 for right image.
 void Frame::ExtractORB(int flag, const cv::Mat& im) {
     if (flag == 0)
         (*mpORBextractorLeft)(im, cv::Mat(), mvKeys, mDescriptors);
@@ -271,11 +278,13 @@ void Frame::ExtractORB(int flag, const cv::Mat& im) {
         (*mpORBextractorRight)(im, cv::Mat(), mvKeysRight, mDescriptorsRight);
 }
 
+// Set the camera pose.
 void Frame::SetPose(cv::Mat Tcw) {
     mTcw = Tcw.clone();
     UpdatePoseMatrices();
 }
 
+// Computes rotation, translation and camera center matrices from the camera pose.
 void Frame::UpdatePoseMatrices() {
     mRcw = mTcw.rowRange(0, 3).colRange(0, 3);
     mRwc = mRcw.t();
@@ -338,7 +347,7 @@ bool Frame::isInFrustum(MapPoint* pMP, float viewingCosLimit) {
 vector<size_t> Frame::GetFeaturesInArea(const float& x, const float& y, const float& r, const int minLevel,
                                         const int maxLevel) const {
     vector<size_t> vIndices;
-    vIndices.reserve(N);
+    vIndices.reserve(keyPointNum);
 
     const int nMinCellX = max(0, (int)floor((x - mnMinX - r) * mfGridElementWidthInv));
     if (nMinCellX >= FRAME_GRID_COLS) return vIndices;
@@ -378,6 +387,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float& x, const float& y, const fl
     return vIndices;
 }
 
+// Compute the cell of a keypoint (return false if outside the grid)
 bool Frame::PosInGrid(const cv::KeyPoint& kp, int& posX, int& posY) {
     posX = round((kp.pt.x - mnMinX) * mfGridElementWidthInv);
     posY = round((kp.pt.y - mnMinY) * mfGridElementHeightInv);
@@ -402,8 +412,8 @@ void Frame::UndistortKeyPoints() {
     }
 
     // Fill matrix with points
-    cv::Mat mat(N, 2, CV_32F);
-    for (int i = 0; i < N; i++) {
+    cv::Mat mat(keyPointNum, 2, CV_32F);
+    for (int i = 0; i < keyPointNum; i++) {
         mat.at<float>(i, 0) = mvKeys[i].pt.x;
         mat.at<float>(i, 1) = mvKeys[i].pt.y;
     }
@@ -414,8 +424,8 @@ void Frame::UndistortKeyPoints() {
     mat = mat.reshape(1);
 
     // Fill undistorted keypoint vector
-    mvKeysUn.resize(N);
-    for (int i = 0; i < N; i++) {
+    mvKeysUn.resize(keyPointNum);
+    for (int i = 0; i < keyPointNum; i++) {
         cv::KeyPoint kp = mvKeys[i];
         kp.pt.x = mat.at<float>(i, 0);
         kp.pt.y = mat.at<float>(i, 1);
@@ -423,6 +433,7 @@ void Frame::UndistortKeyPoints() {
     }
 }
 
+// Computes image bounds for the undistorted image (called in the constructor).
 void Frame::ComputeImageBounds(const cv::Mat& imLeft) {
     if (mDistCoef.at<float>(0) != 0.0) {
         cv::Mat mat(4, 2, CV_32F);
@@ -454,8 +465,8 @@ void Frame::ComputeImageBounds(const cv::Mat& imLeft) {
 }
 
 void Frame::ComputeStereoMatches() {
-    mvuRight = vector<float>(N, -1.0f);
-    mvDepth = vector<float>(N, -1.0f);
+    mvuRight = vector<float>(keyPointNum, -1.0f);
+    mvDepth = vector<float>(keyPointNum, -1.0f);
 
     const int thOrbDist = (ORBmatcher::TH_HIGH + ORBmatcher::TH_LOW) / 2;
 
@@ -485,9 +496,9 @@ void Frame::ComputeStereoMatches() {
 
     // For each left keypoint search a match in the right image
     vector<pair<int, int> > vDistIdx;
-    vDistIdx.reserve(N);
+    vDistIdx.reserve(keyPointNum);
 
-    for (int iL = 0; iL < N; iL++) {
+    for (int iL = 0; iL < keyPointNum; iL++) {
         const cv::KeyPoint& kpL = mvKeys[iL];
         const int& levelL = kpL.octave;
         const float& vL = kpL.pt.y;
@@ -613,10 +624,10 @@ void Frame::ComputeStereoMatches() {
 }
 
 void Frame::ComputeStereoFromRGBD(const cv::Mat& imDepth) {
-    mvuRight = vector<float>(N, -1);
-    mvDepth = vector<float>(N, -1);
+    mvuRight = vector<float>(keyPointNum, -1);
+    mvDepth = vector<float>(keyPointNum, -1);
 
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < keyPointNum; i++) {
         const cv::KeyPoint& kp = mvKeys[i];
         const cv::KeyPoint& kpU = mvKeysUn[i];
 

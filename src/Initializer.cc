@@ -26,6 +26,7 @@
 
 namespace ORB_SLAM2 {
 
+// Fix the reference frame
 Initializer::Initializer(const Frame& ReferenceFrame, float sigma, int iterations) {
     mK = ReferenceFrame.mK.clone();
 
@@ -36,6 +37,8 @@ Initializer::Initializer(const Frame& ReferenceFrame, float sigma, int iteration
     mMaxIterations = iterations;
 }
 
+// Computes in parallel a fundamental matrix and a homography
+// Selects a model and tries to recover the motion and the structure from motion
 bool Initializer::Initialize(const Frame& CurrentFrame, const vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
                              vector<cv::Point3f>& vP3D, vector<bool>& vbTriangulated) {
     // Fill structures with current keypoints and matches with reference frame

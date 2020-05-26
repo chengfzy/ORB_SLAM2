@@ -24,7 +24,6 @@
 #include <opencv2/core/core.hpp>
 #include <string>
 #include <thread>
-
 #include "FrameDrawer.h"
 #include "KeyFrameDatabase.h"
 #include "LocalMapping.h"
@@ -34,6 +33,7 @@
 #include "ORBVocabulary.h"
 #include "Tracking.h"
 #include "Viewer.h"
+
 namespace ORB_SLAM2 {
 
 class Viewer;

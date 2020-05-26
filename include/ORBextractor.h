@@ -21,7 +21,7 @@
 #ifndef ORBEXTRACTOR_H
 #define ORBEXTRACTOR_H
 
-#include <opencv/cv.h>
+#include <opencv2/imgproc/imgproc_c.h>
 #include <list>
 #include <vector>
 

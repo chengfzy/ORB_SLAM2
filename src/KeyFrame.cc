@@ -52,7 +52,7 @@ KeyFrame::KeyFrame(Frame& F, Map* pMap, KeyFrameDatabase* pKFDB)
       mbf(F.mbf),
       mb(F.mb),
       mThDepth(F.mThDepth),
-      N(F.N),
+      N(F.keyPointNum),
       mvKeys(F.mvKeys),
       mvKeysUn(F.mvKeysUn),
       mvuRight(F.mvuRight),
