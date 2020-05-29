@@ -41,10 +41,10 @@ namespace g2o {
   OptimizationAlgorithmDogleg::OptimizationAlgorithmDogleg(BlockSolverBase* solver) :
     OptimizationAlgorithmWithHessian(solver)
   {
-    _userDeltaInit = _properties.makeProperty<Property<double> >("initialDelta", 1e4);
-    _maxTrialsAfterFailure = _properties.makeProperty<Property<int> >("maxTrialsAfterFailure", 100);
-    _initialLambda = _properties.makeProperty<Property<double> >("initialLambda", 1e-7);
-    _lamdbaFactor = _properties.makeProperty<Property<double> >("lambdaFactor", 10.);
+    _userDeltaInit = _properties.makeProperty<Property<double>>("initialDelta", 1e4);
+    _maxTrialsAfterFailure = _properties.makeProperty<Property<int>>("maxTrialsAfterFailure", 100);
+    _initialLambda = _properties.makeProperty<Property<double>>("initialLambda", 1e-7);
+    _lamdbaFactor = _properties.makeProperty<Property<double>>("lambdaFactor", 10.);
     _delta = _userDeltaInit->value();
     _lastStep = STEP_UNDEFINED;
     _wasPDInAllIterations = true;

@@ -42,9 +42,22 @@ class FrameDrawer {
     void Update(Tracking* pTracker);
 
     // Draw last processed frame.
+
+    /**
+     * @brief Draw last processed frame.
+     *
+     * @return 返回绘制完成的图像，可以直接进行显示
+     */
     cv::Mat DrawFrame();
 
   protected:
+    /**
+     * @brief 绘制底部的信息栏
+     *
+     * @param im      原始回复你
+     * @param nState  当前系统的状态
+     * @param imText  叠加后的图像
+     */
     void DrawTextInfo(cv::Mat& im, int nState, cv::Mat& imText);
 
     // Info of the frame to be drawn

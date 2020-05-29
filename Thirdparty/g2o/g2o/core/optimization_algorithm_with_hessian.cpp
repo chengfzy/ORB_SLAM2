@@ -39,7 +39,7 @@ namespace g2o {
     OptimizationAlgorithm(),
     _solver(solver)
   {
-    _writeDebug = _properties.makeProperty<Property<bool> >("writeDebug", true);
+    _writeDebug = _properties.makeProperty<Property<bool>>("writeDebug", true);
   }
 
   OptimizationAlgorithmWithHessian::~OptimizationAlgorithmWithHessian()
@@ -72,7 +72,7 @@ namespace g2o {
     return initState;
   }
 
-  bool OptimizationAlgorithmWithHessian::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int> >& blockIndices)
+  bool OptimizationAlgorithmWithHessian::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int>>& blockIndices)
   {
     return _solver ? _solver->computeMarginals(spinv, blockIndices) : false;
   }

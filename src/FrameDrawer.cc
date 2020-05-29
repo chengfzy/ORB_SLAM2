@@ -137,6 +137,7 @@ void FrameDrawer::DrawTextInfo(cv::Mat& im, int nState, cv::Mat& imText) {
                 8);
 }
 
+//将跟踪线程的数据拷贝到绘图线程（图像、特征点、地图、跟踪状态）
 void FrameDrawer::Update(Tracking* pTracker) {
     unique_lock<mutex> lock(mMutex);
     pTracker->mImGray.copyTo(mIm);
@@ -147,9 +148,11 @@ void FrameDrawer::Update(Tracking* pTracker) {
     mbOnlyTracking = pTracker->mbOnlyTracking;
 
     if (pTracker->mLastProcessedState == Tracking::NOT_INITIALIZED) {
+        // 如果上一帧没有初始化，就获取参考帧的特征点和匹配信息
         mvIniKeys = pTracker->mInitialFrame.mvKeys;
         mvIniMatches = pTracker->mvIniMatches;
     } else if (pTracker->mLastProcessedState == Tracking::OK) {
+        // 获取地图点信息
         for (int i = 0; i < N; i++) {
             MapPoint* pMP = pTracker->mCurrentFrame.mvpMapPoints[i];
             if (pMP) {
@@ -162,6 +165,8 @@ void FrameDrawer::Update(Tracking* pTracker) {
             }
         }
     }
+
+    // 更新Tracking线程的状态
     mState = static_cast<int>(pTracker->mLastProcessedState);
 }
 

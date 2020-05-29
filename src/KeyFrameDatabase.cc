@@ -87,7 +87,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
 
     if (lKFsSharingWords.empty()) return vector<KeyFrame*>();
 
-    list<pair<float, KeyFrame*> > lScoreAndMatch;
+    list<pair<float, KeyFrame*>> lScoreAndMatch;
 
     // Only compare against those keyframes that share enough words
     int maxCommonWords = 0;
@@ -115,11 +115,11 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
 
     if (lScoreAndMatch.empty()) return vector<KeyFrame*>();
 
-    list<pair<float, KeyFrame*> > lAccScoreAndMatch;
+    list<pair<float, KeyFrame*>> lAccScoreAndMatch;
     float bestAccScore = minScore;
 
     // Lets now accumulate score by covisibility
-    for (list<pair<float, KeyFrame*> >::iterator it = lScoreAndMatch.begin(), itend = lScoreAndMatch.end(); it != itend;
+    for (list<pair<float, KeyFrame*>>::iterator it = lScoreAndMatch.begin(), itend = lScoreAndMatch.end(); it != itend;
          it++) {
         KeyFrame* pKFi = it->second;
         vector<KeyFrame*> vpNeighs = pKFi->GetBestCovisibilityKeyFrames(10);
@@ -149,7 +149,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
     vector<KeyFrame*> vpLoopCandidates;
     vpLoopCandidates.reserve(lAccScoreAndMatch.size());
 
-    for (list<pair<float, KeyFrame*> >::iterator it = lAccScoreAndMatch.begin(), itend = lAccScoreAndMatch.end();
+    for (list<pair<float, KeyFrame*>>::iterator it = lAccScoreAndMatch.begin(), itend = lAccScoreAndMatch.end();
          it != itend; it++) {
         if (it->first > minScoreToRetain) {
             KeyFrame* pKFi = it->second;
@@ -194,7 +194,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* F) {
 
     int minCommonWords = maxCommonWords * 0.8f;
 
-    list<pair<float, KeyFrame*> > lScoreAndMatch;
+    list<pair<float, KeyFrame*>> lScoreAndMatch;
 
     int nscores = 0;
 
@@ -212,11 +212,11 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* F) {
 
     if (lScoreAndMatch.empty()) return vector<KeyFrame*>();
 
-    list<pair<float, KeyFrame*> > lAccScoreAndMatch;
+    list<pair<float, KeyFrame*>> lAccScoreAndMatch;
     float bestAccScore = 0;
 
     // Lets now accumulate score by covisibility
-    for (list<pair<float, KeyFrame*> >::iterator it = lScoreAndMatch.begin(), itend = lScoreAndMatch.end(); it != itend;
+    for (list<pair<float, KeyFrame*>>::iterator it = lScoreAndMatch.begin(), itend = lScoreAndMatch.end(); it != itend;
          it++) {
         KeyFrame* pKFi = it->second;
         vector<KeyFrame*> vpNeighs = pKFi->GetBestCovisibilityKeyFrames(10);
@@ -243,7 +243,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* F) {
     set<KeyFrame*> spAlreadyAddedKF;
     vector<KeyFrame*> vpRelocCandidates;
     vpRelocCandidates.reserve(lAccScoreAndMatch.size());
-    for (list<pair<float, KeyFrame*> >::iterator it = lAccScoreAndMatch.begin(), itend = lAccScoreAndMatch.end();
+    for (list<pair<float, KeyFrame*>>::iterator it = lAccScoreAndMatch.begin(), itend = lAccScoreAndMatch.end();
          it != itend; it++) {
         const float& si = it->first;
         if (si > minScoreToRetain) {

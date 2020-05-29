@@ -557,7 +557,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
 
     int iteration = 0;
 
-    vector<pair<int, ExtractorNode*> > vSizeAndPointerToNode;
+    vector<pair<int, ExtractorNode*>> vSizeAndPointerToNode;
     vSizeAndPointerToNode.reserve(lNodes.size() * 4);
 
     while (!bFinish) {
@@ -628,7 +628,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
             while (!bFinish) {
                 prevSize = lNodes.size();
 
-                vector<pair<int, ExtractorNode*> > vPrevSizeAndPointerToNode = vSizeAndPointerToNode;
+                vector<pair<int, ExtractorNode*>> vPrevSizeAndPointerToNode = vSizeAndPointerToNode;
                 vSizeAndPointerToNode.clear();
 
                 sort(vPrevSizeAndPointerToNode.begin(), vPrevSizeAndPointerToNode.end());
@@ -697,7 +697,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
     return vResultKeys;
 }
 
-void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoints) {
+void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint>>& allKeypoints) {
     allKeypoints.resize(nlevels);
 
     const float W = 30;
@@ -771,7 +771,7 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoin
     for (int level = 0; level < nlevels; ++level) computeOrientation(mvImagePyramid[level], allKeypoints[level], umax);
 }
 
-void ORBextractor::ComputeKeyPointsOld(std::vector<std::vector<KeyPoint> >& allKeypoints) {
+void ORBextractor::ComputeKeyPointsOld(std::vector<std::vector<KeyPoint>>& allKeypoints) {
     allKeypoints.resize(nlevels);
 
     float imageRatio = (float)mvImagePyramid[0].cols / mvImagePyramid[0].rows;
@@ -795,11 +795,11 @@ void ORBextractor::ComputeKeyPointsOld(std::vector<std::vector<KeyPoint> >& allK
         const int nCells = levelRows * levelCols;
         const int nfeaturesCell = ceil((float)nDesiredFeatures / nCells);
 
-        vector<vector<vector<KeyPoint> > > cellKeyPoints(levelRows, vector<vector<KeyPoint> >(levelCols));
+        vector<vector<vector<KeyPoint>>> cellKeyPoints(levelRows, vector<vector<KeyPoint>>(levelCols));
 
-        vector<vector<int> > nToRetain(levelRows, vector<int>(levelCols, 0));
-        vector<vector<int> > nTotal(levelRows, vector<int>(levelCols, 0));
-        vector<vector<bool> > bNoMore(levelRows, vector<bool>(levelCols, false));
+        vector<vector<int>> nToRetain(levelRows, vector<int>(levelCols, 0));
+        vector<vector<int>> nTotal(levelRows, vector<int>(levelCols, 0));
+        vector<vector<bool>> bNoMore(levelRows, vector<bool>(levelCols, false));
         vector<int> iniXCol(levelCols);
         vector<int> iniYRow(levelRows);
         int nNoMore = 0;
@@ -933,7 +933,7 @@ void ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoi
     // Pre-compute the scale pyramid
     ComputePyramid(image);
 
-    vector<vector<KeyPoint> > allKeypoints;
+    vector<vector<KeyPoint>> allKeypoints;
     ComputeKeyPointsOctTree(allKeypoints);
     // ComputeKeyPointsOld(allKeypoints);
 

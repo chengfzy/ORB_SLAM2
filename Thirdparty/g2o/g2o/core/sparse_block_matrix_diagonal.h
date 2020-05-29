@@ -55,7 +55,7 @@ namespace g2o {
       //! rows of the matrix
       int rows() const {return _blockIndices.size() ? _blockIndices.back() : 0;}
 
-      typedef std::vector<MatrixType, Eigen::aligned_allocator<MatrixType> >      DiagonalVector;
+      typedef std::vector<MatrixType, Eigen::aligned_allocator<MatrixType>>      DiagonalVector;
 
       SparseBlockMatrixDiagonal(const std::vector<int>& blockIndices) :
         _blockIndices(blockIndices)

@@ -50,7 +50,7 @@ namespace g2o {
   class  JacobianWorkspace
   {
     public:
-      typedef std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd> >      WorkspaceVector;
+      typedef std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd>>      WorkspaceVector;
 
     public:
       JacobianWorkspace();

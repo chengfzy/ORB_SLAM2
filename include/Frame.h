@@ -136,6 +136,8 @@ class Frame {
 
     // Corresponding stereo coordinate and depth for each keypoint.
     // "Monocular" keypoints have a negative value.
+    // 对于双目，mvuRight存储的是左目像素点在右目对应点的横坐标(因为纵坐标是一样的)， mvDepth为对应的深度。
+    // 对于单目，以下两个变量均为负值-1.
     std::vector<float> mvuRight;
     std::vector<float> mvDepth;
 
@@ -168,11 +170,12 @@ class Frame {
     KeyFrame* mpReferenceKF;
 
     // Scale pyramid info.
-    int mnScaleLevels;
-    float mfScaleFactor;
-    float mfLogScaleFactor;
-    vector<float> mvScaleFactors;
-    vector<float> mvInvScaleFactors;
+    // 图像金字塔相关信息
+    int mnScaleLevels;                // 金字塔层数
+    float mfScaleFactor;              // 金字塔尺度因子
+    float mfLogScaleFactor;           // 尺度因子对应的对数值
+    vector<float> mvScaleFactors;     // 每一层的缩放因子
+    vector<float> mvInvScaleFactors;  // 每一层缩放因子的导数
     vector<float> mvLevelSigma2;
     vector<float> mvInvLevelSigma2;
 

@@ -127,7 +127,7 @@ namespace g2o {
      * @param spinv: the sparse block matrix with the result
      * @returns false if the operation is not supported by the solver
      */
-    bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int> >& blockIndices);
+    bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int>>& blockIndices);
 
     /**
      * computes the inverse of the specified vertex.
@@ -139,7 +139,7 @@ namespace g2o {
       if (vertex->hessianIndex() < 0) {
           return false;
       }
-      std::vector<std::pair<int, int> > index;
+      std::vector<std::pair<int, int>> index;
       index.push_back(std::pair<int, int>(vertex->hessianIndex(), vertex->hessianIndex()));
       return computeMarginals(spinv, index);
     }
@@ -151,7 +151,7 @@ namespace g2o {
      * @returns false if the operation is not supported by the solver
      */
     bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const VertexContainer& vertices) {
-      std::vector<std::pair<int, int> > indices;
+      std::vector<std::pair<int, int>> indices;
       for (VertexContainer::const_iterator it = vertices.begin(); it != vertices.end(); ++it) {
         indices.push_back(std::pair<int, int>((*it)->hessianIndex(),(*it)->hessianIndex()));
       }

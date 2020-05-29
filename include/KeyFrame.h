@@ -108,11 +108,11 @@ class KeyFrame {
 
     static bool lId(KeyFrame* pKF1, KeyFrame* pKF2) { return pKF1->mnId < pKF2->mnId; }
 
-    // The following variables are accesed from only 1 thread or never change (no mutex needed).
+    // The following variables are accessed from only 1 thread or never change (no mutex needed).
   public:
     static long unsigned int nNextId;
-    long unsigned int mnId;
-    const long unsigned int mnFrameId;
+    long unsigned int mnId;             //当前KeyFrame在ID
+    const long unsigned int mnFrameId;  //每个KeyFrame也是一个Frame，记录了该KeyFrame是由哪个Frame初始化的
 
     const double mTimeStamp;
 
@@ -139,7 +139,7 @@ class KeyFrame {
     float mRelocScore;
 
     // Variables used by loop closing
-    cv::Mat mTcwGBA;
+    cv::Mat mTcwGBA;  // 经过全局BA优化后的相机位姿
     cv::Mat mTcwBefGBA;
     long unsigned int mnBAGlobalForKF;
 
@@ -181,7 +181,7 @@ class KeyFrame {
     // The following variables need to be accessed trough a mutex to be thread safe.
   protected:
     // SE3 Pose and camera center
-    cv::Mat Tcw;
+    cv::Mat Tcw;  // 当前相机的位姿
     cv::Mat Twc;
     cv::Mat Ow;
 
@@ -195,17 +195,17 @@ class KeyFrame {
     ORBVocabulary* mpORBvocabulary;
 
     // Grid over the image to speed up feature matching
-    std::vector<std::vector<std::vector<size_t> > > mGrid;
+    std::vector<std::vector<std::vector<size_t>>> mGrid;
 
-    std::map<KeyFrame*, int> mConnectedKeyFrameWeights;
-    std::vector<KeyFrame*> mvpOrderedConnectedKeyFrames;
-    std::vector<int> mvOrderedWeights;
+    std::map<KeyFrame*, int> mConnectedKeyFrameWeights;   // 与该关键帧连接(共视)的关键帧和权重
+    std::vector<KeyFrame*> mvpOrderedConnectedKeyFrames;  // 排序后的关键帧，与mvOrderedWeights对应
+    std::vector<int> mvOrderedWeights;                    // 排序后的权重(从大到小)
 
     // Spanning Tree and Loop Edges
-    bool mbFirstConnection;
-    KeyFrame* mpParent;
-    std::set<KeyFrame*> mspChildrens;
-    std::set<KeyFrame*> mspLoopEdges;
+    bool mbFirstConnection;            // 是否是第一次生成树
+    KeyFrame* mpParent;                // 当前关键帧的父关键帧
+    std::set<KeyFrame*> mspChildrens;  // 当前关键帧的子关键帧
+    std::set<KeyFrame*> mspLoopEdges;  // 和当前帧形成回环关系的关键帧
 
     // Bad flags
     bool mbNotErase;

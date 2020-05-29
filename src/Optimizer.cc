@@ -57,38 +57,48 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame*>& vpKFs, const vector<Ma
 
     if (pbStopFlag) optimizer.setForceStopFlag(pbStopFlag);
 
-    long unsigned int maxKFid = 0;
+    long unsigned int maxKFid = 0;  // 优化中关键帧的最大ID
 
     // Set KeyFrame vertices
+    // 添加关键帧位姿顶点
     for (size_t i = 0; i < vpKFs.size(); i++) {
         KeyFrame* pKF = vpKFs[i];
         if (pKF->isBad()) continue;
+
+        // 对于每一个能用的关键帧构造SE3顶点，其实就是当前关键帧的位姿
         g2o::VertexSE3Expmap* vSE3 = new g2o::VertexSE3Expmap();
         vSE3->setEstimate(Converter::toSE3Quat(pKF->GetPose()));
         vSE3->setId(pKF->mnId);
-        vSE3->setFixed(pKF->mnId == 0);
+        vSE3->setFixed(pKF->mnId == 0);  // 第0帧不优化
+
+        // 添加说的话，并更新maxKfId
         optimizer.addVertex(vSE3);
-        if (pKF->mnId > maxKFid) maxKFid = pKF->mnId;
+        if (pKF->mnId > maxKFid) {
+            maxKFid = pKF->mnId;
+        }
     }
 
-    const float thHuber2D = sqrt(5.99);
-    const float thHuber3D = sqrt(7.815);
+    // 卡方分布95%以上可信度的阈值
+    const float thHuber2D = sqrt(5.99);   // DOF=2
+    const float thHuber3D = sqrt(7.815);  // DOF=3
 
     // Set MapPoint vertices
+    // 添加地图点作为顶点
     for (size_t i = 0; i < vpMP.size(); i++) {
         MapPoint* pMP = vpMP[i];
         if (pMP->isBad()) continue;
         g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
         vPoint->setEstimate(Converter::toVector3d(pMP->GetWorldPos()));
-        const int id = pMP->mnId + maxKFid + 1;
+        const int id = pMP->mnId + maxKFid + 1;  // mapID的计算，g2o中ID必须唯一
         vPoint->setId(id);
         vPoint->setMarginalized(true);
         optimizer.addVertex(vPoint);
 
         const map<KeyFrame*, size_t> observations = pMP->GetObservations();
 
-        int nEdges = 0;
+        int nEdges = 0;  // 边计数
         // SET EDGES
+        // 添加边，即重投影误差
         for (map<KeyFrame*, size_t>::const_iterator mit = observations.begin(); mit != observations.end(); mit++) {
             KeyFrame* pKF = mit->first;
             if (pKF->isBad() || pKF->mnId > maxKFid) continue;
@@ -97,7 +107,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame*>& vpKFs, const vector<Ma
 
             const cv::KeyPoint& kpUn = pKF->mvKeysUn[mit->second];
 
-            if (pKF->mvuRight[mit->second] < 0) {
+            if (pKF->mvuRight[mit->second] < 0) {  // 单目相机
                 Eigen::Matrix<double, 2, 1> obs;
                 obs << kpUn.pt.x, kpUn.pt.y;
 
@@ -106,22 +116,26 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame*>& vpKFs, const vector<Ma
                 e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
                 e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKF->mnId)));
                 e->setMeasurement(obs);
+                // 信息矩阵，即协方差，在x,y两个方向是一样的。
+                // 其可信程度与特征点在图像金字塔的层数相关，层数越高，可信度越差
                 const float& invSigma2 = pKF->mvInvLevelSigma2[kpUn.octave];
                 e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
 
+                // robust kernel，和卡方分布的阈值相关
                 if (bRobust) {
                     g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
                     e->setRobustKernel(rk);
                     rk->setDelta(thHuber2D);
                 }
 
+                // 相机内参
                 e->fx = pKF->fx;
                 e->fy = pKF->fy;
                 e->cx = pKF->cx;
                 e->cy = pKF->cy;
 
                 optimizer.addEdge(e);
-            } else {
+            } else {  // 双目相机
                 Eigen::Matrix<double, 3, 1> obs;
                 const float kp_ur = pKF->mvuRight[mit->second];
                 obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
@@ -151,6 +165,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame*>& vpKFs, const vector<Ma
             }
         }
 
+        // 如果没有任何关键帧观测到当前地图点，则删掉这个顶点，并且这个地图点也不参与优化
         if (nEdges == 0) {
             optimizer.removeVertex(vPoint);
             vbNotIncludedMP[i] = true;
@@ -164,6 +179,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame*>& vpKFs, const vector<Ma
     optimizer.optimize(nIterations);
 
     // Recover optimized data
+    // 处理优化的结果
 
     // Keyframes
     for (size_t i = 0; i < vpKFs.size(); i++) {
@@ -172,8 +188,11 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame*>& vpKFs, const vector<Ma
         g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->mnId));
         g2o::SE3Quat SE3quat = vSE3->estimate();
         if (nLoopKF == 0) {
+            // 原则上是不会出现闭环关键帧是第0帧的情况，如果出现这种情况，只能够说明是在创建初始地图点的时候调用了全局BA函数
+            // 这时，地图中只有两个关键帧，其中优化后的位姿数据可以直接写入到帧的成员变量中
             pKF->SetPose(Converter::toCvMat(SE3quat));
         } else {
+            // 正常情况下，先把优化后的位姿写入到帧的一个专门的成员变量中备用
             pKF->mTcwGBA.create(4, 4, CV_32F);
             Converter::toCvMat(SE3quat).copyTo(pKF->mTcwGBA);
             pKF->mnBAGlobalForKF = nLoopKF;
@@ -191,9 +210,11 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame*>& vpKFs, const vector<Ma
             static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->mnId + maxKFid + 1));
 
         if (nLoopKF == 0) {
+            // 如果是在创建初始地图的时候调用的话，地图点位姿也可以直接写入
             pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
             pMP->UpdateNormalAndDepth();
         } else {
+            // 否则，是在正常闭环时调用，先临时保存一下
             pMP->mPosGBA.create(3, 1, CV_32F);
             Converter::toCvMat(vPoint->estimate()).copyTo(pMP->mPosGBA);
             pMP->mnBAGlobalForKF = nLoopKF;
@@ -620,7 +641,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF, bool* pbStopFlag, Map* pMap
         optimizer.optimize(10);
     }
 
-    vector<pair<KeyFrame*, MapPoint*> > vToErase;
+    vector<pair<KeyFrame*, MapPoint*>> vToErase;
     vToErase.reserve(vpEdgesMono.size() + vpEdgesStereo.size());
 
     // Check inlier observations
@@ -683,7 +704,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF, bool* pbStopFlag, Map* pMap
 void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF,
                                        const LoopClosing::KeyFrameAndPose& NonCorrectedSim3,
                                        const LoopClosing::KeyFrameAndPose& CorrectedSim3,
-                                       const map<KeyFrame*, set<KeyFrame*> >& LoopConnections, const bool& bFixScale) {
+                                       const map<KeyFrame*, set<KeyFrame*>>& LoopConnections, const bool& bFixScale) {
     // Setup optimizer
     g2o::SparseOptimizer optimizer;
     optimizer.setVerbose(false);
@@ -700,8 +721,8 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 
     const unsigned int nMaxKFid = pMap->GetMaxKFid();
 
-    vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3> > vScw(nMaxKFid + 1);
-    vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3> > vCorrectedSwc(nMaxKFid + 1);
+    vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3>> vScw(nMaxKFid + 1);
+    vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3>> vCorrectedSwc(nMaxKFid + 1);
     vector<g2o::VertexSim3Expmap*> vpVertices(nMaxKFid + 1);
 
     const int minFeat = 100;
@@ -738,12 +759,12 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
         vpVertices[nIDi] = VSim3;
     }
 
-    set<pair<long unsigned int, long unsigned int> > sInsertedEdges;
+    set<pair<long unsigned int, long unsigned int>> sInsertedEdges;
 
     const Eigen::Matrix<double, 7, 7> matLambda = Eigen::Matrix<double, 7, 7>::Identity();
 
     // Set Loop edges
-    for (map<KeyFrame*, set<KeyFrame*> >::const_iterator mit = LoopConnections.begin(), mend = LoopConnections.end();
+    for (map<KeyFrame*, set<KeyFrame*>>::const_iterator mit = LoopConnections.begin(), mend = LoopConnections.end();
          mit != mend; mit++) {
         KeyFrame* pKF = mit->first;
         const long unsigned int nIDi = pKF->mnId;

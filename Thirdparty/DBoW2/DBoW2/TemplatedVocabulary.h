@@ -93,7 +93,7 @@ public:
    * @param training_features
    */
   virtual void create
-    (const std::vector<std::vector<TDescriptor> > &training_features);
+    (const std::vector<std::vector<TDescriptor>> &training_features);
   
   /**
    * Creates a vocabulary from the training features, setting the branching
@@ -103,7 +103,7 @@ public:
    * @param L depth levels
    */
   virtual void create
-    (const std::vector<std::vector<TDescriptor> > &training_features, 
+    (const std::vector<std::vector<TDescriptor>> &training_features, 
       int k, int L);
 
   /**
@@ -112,7 +112,7 @@ public:
    * schemes
    */
   virtual void create
-    (const std::vector<std::vector<TDescriptor> > &training_features,
+    (const std::vector<std::vector<TDescriptor>> &training_features,
       int k, int L, WeightingType weighting, ScoringType scoring);
 
   /**
@@ -341,7 +341,7 @@ protected:
    * @param features (out) pointers to the training features
    */
   void getFeatures(
-    const vector<vector<TDescriptor> > &training_features, 
+    const vector<vector<TDescriptor>> &training_features, 
     vector<pDescriptor> &features) const;
 
   /**
@@ -400,7 +400,7 @@ protected:
    * created (by calling HKmeansStep and createWords)
    * @param features
    */
-  void setNodeWeights(const vector<vector<TDescriptor> > &features);
+  void setNodeWeights(const vector<vector<TDescriptor>> &features);
   
 protected:
 
@@ -556,7 +556,7 @@ TemplatedVocabulary<TDescriptor,F>::operator=
 
 template<class TDescriptor, class F>
 void TemplatedVocabulary<TDescriptor,F>::create(
-  const std::vector<std::vector<TDescriptor> > &training_features)
+  const std::vector<std::vector<TDescriptor>> &training_features)
 {
   m_nodes.clear();
   m_words.clear();
@@ -590,7 +590,7 @@ void TemplatedVocabulary<TDescriptor,F>::create(
 
 template<class TDescriptor, class F>
 void TemplatedVocabulary<TDescriptor,F>::create(
-  const std::vector<std::vector<TDescriptor> > &training_features,
+  const std::vector<std::vector<TDescriptor>> &training_features,
   int k, int L)
 {
   m_k = k;
@@ -603,7 +603,7 @@ void TemplatedVocabulary<TDescriptor,F>::create(
 
 template<class TDescriptor, class F>
 void TemplatedVocabulary<TDescriptor,F>::create(
-  const std::vector<std::vector<TDescriptor> > &training_features,
+  const std::vector<std::vector<TDescriptor>> &training_features,
   int k, int L, WeightingType weighting, ScoringType scoring)
 {
   m_k = k;
@@ -619,12 +619,12 @@ void TemplatedVocabulary<TDescriptor,F>::create(
 
 template<class TDescriptor, class F>
 void TemplatedVocabulary<TDescriptor,F>::getFeatures(
-  const vector<vector<TDescriptor> > &training_features, 
+  const vector<vector<TDescriptor>> &training_features, 
   vector<pDescriptor> &features) const
 {
   features.resize(0);
   
-  typename vector<vector<TDescriptor> >::const_iterator vvit;
+  typename vector<vector<TDescriptor>>::const_iterator vvit;
   typename vector<TDescriptor>::const_iterator vit;
   for(vvit = training_features.begin(); vvit != training_features.end(); ++vvit)
   {
@@ -646,7 +646,7 @@ void TemplatedVocabulary<TDescriptor,F>::HKmeansStep(NodeId parent_id,
         
   // features associated to each cluster
   vector<TDescriptor> clusters;
-	vector<vector<unsigned int> > groups; // groups[i] = [j1, j2, ...]
+	vector<vector<unsigned int>> groups; // groups[i] = [j1, j2, ...]
 	// j1, j2, ... indices of descriptors associated to cluster i
 
   clusters.reserve(m_k);
@@ -941,7 +941,7 @@ void TemplatedVocabulary<TDescriptor,F>::createWords()
 
 template<class TDescriptor, class F>
 void TemplatedVocabulary<TDescriptor,F>::setNodeWeights
-  (const vector<vector<TDescriptor> > &training_features)
+  (const vector<vector<TDescriptor>> &training_features)
 {
   const unsigned int NWords = m_words.size();
   const unsigned int NDocs = training_features.size();
@@ -962,7 +962,7 @@ void TemplatedVocabulary<TDescriptor,F>::setNodeWeights
     vector<unsigned int> Ni(NWords, 0);
     vector<bool> counted(NWords, false);
     
-    typename vector<vector<TDescriptor> >::const_iterator mit;
+    typename vector<vector<TDescriptor>>::const_iterator mit;
     typename vector<TDescriptor>::const_iterator fit;
 
     for(mit = training_features.begin(); mit != training_features.end(); ++mit)

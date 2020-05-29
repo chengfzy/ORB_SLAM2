@@ -567,7 +567,7 @@ namespace g2o{
       _algorithm->setOptimizer(this);
   }
 
-  bool SparseOptimizer::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int> >& blockIndices){
+  bool SparseOptimizer::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int>>& blockIndices){
     return _algorithm->computeMarginals(spinv, blockIndices);
   }
 

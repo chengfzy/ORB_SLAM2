@@ -237,6 +237,11 @@ float MapPoint::GetFoundRatio() {
     return static_cast<float>(mnFound) / mnVisible;
 }
 
+// 计算具体代表性的描述子
+// 由于一个MapPoint会被许多相机观测到，因此在插入关键帧后，需要判断是否更新当前点最合适的描述子。
+// 先获得当前点的所有描述子，然后计算描述子之间的两两距离，最好的描述子与其他描述子应该具有最小的距离中值
+// 参考 [1]D. Galvez-López and J. D. Tardos, “Bags of Binary Words for Fast Place Recognition in Image Sequences,” IEEE
+// Trans. Robot., vol. 28, no. 5, pp. 1188–1197, Oct. 2012, doi: 10.1109/TRO.2012.2197158.
 void MapPoint::ComputeDistinctiveDescriptors() {
     // Retrieve all observed descriptors
     vector<cv::Mat> vDescriptors;
@@ -312,6 +317,14 @@ bool MapPoint::IsInKeyFrame(KeyFrame* pKF) {
     return (mObservations.count(pKF));
 }
 
+/**
+ * @brief 更新平均观测方向及观测距离范围
+ *
+ * 由于一个MapPoint会被许多相机（帧）观测到，因此在插入关键帧后，需要更新相应变量
+ * 参考 D. Galvez-López and J. D. Tardos, “Bags of Binary Words for Fast Place Recognition in Image Sequences,”
+IEEE Trans. Robot., vol. 28, no. 5, pp. 1188–1197, Oct. 2012, doi: 10.1109/TRO.2012.2197158.
+ * @return
+ */
 void MapPoint::UpdateNormalAndDepth() {
     map<KeyFrame*, size_t> observations;
     KeyFrame* pRefKF;
@@ -333,7 +346,7 @@ void MapPoint::UpdateNormalAndDepth() {
         KeyFrame* pKF = mit->first;
         cv::Mat Owi = pKF->GetCameraCenter();
         cv::Mat normali = mWorldPos - Owi;
-        normal = normal + normali / cv::norm(normali);
+        normal = normal + normali / cv::norm(normali);  // 对所有关键帧对该点的观测方向归一化为单位向量进行求和
         n++;
     }
 
@@ -345,9 +358,9 @@ void MapPoint::UpdateNormalAndDepth() {
 
     {
         unique_lock<mutex> lock3(mMutexPos);
-        mfMaxDistance = dist * levelScaleFactor;
-        mfMinDistance = mfMaxDistance / pRefKF->mvScaleFactors[nLevels - 1];
-        mNormalVector = normal / n;
+        mfMaxDistance = dist * levelScaleFactor;                              // 观测到该点的距离下限
+        mfMinDistance = mfMaxDistance / pRefKF->mvScaleFactors[nLevels - 1];  // 观测到该点的距离上限
+        mNormalVector = normal / n;                                           // 获得平均的观测方向
     }
 }
 

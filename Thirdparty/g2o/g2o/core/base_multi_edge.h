@@ -98,7 +98,7 @@ namespace g2o {
       using BaseEdge<D,E>::_dimension;
 
       std::vector<HessianHelper> _hessian;
-      std::vector<JacobianType, aligned_allocator<JacobianType> > _jacobianOplus; ///< jacobians of the edge (w.r.t. oplus)
+      std::vector<JacobianType, aligned_allocator<JacobianType>> _jacobianOplus; ///< jacobians of the edge (w.r.t. oplus)
 
       void computeQuadraticForm(const InformationType& omega, const ErrorVector& weightedError);
 

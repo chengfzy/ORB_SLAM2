@@ -69,12 +69,12 @@ class ORBextractor {
 
   protected:
     void ComputePyramid(cv::Mat image);
-    void ComputeKeyPointsOctTree(std::vector<std::vector<cv::KeyPoint> >& allKeypoints);
+    void ComputeKeyPointsOctTree(std::vector<std::vector<cv::KeyPoint>>& allKeypoints);
     std::vector<cv::KeyPoint> DistributeOctTree(const std::vector<cv::KeyPoint>& vToDistributeKeys, const int& minX,
                                                 const int& maxX, const int& minY, const int& maxY, const int& nFeatures,
                                                 const int& level);
 
-    void ComputeKeyPointsOld(std::vector<std::vector<cv::KeyPoint> >& allKeypoints);
+    void ComputeKeyPointsOld(std::vector<std::vector<cv::KeyPoint>>& allKeypoints);
     std::vector<cv::Point> pattern;
 
     int nfeatures;

@@ -68,7 +68,7 @@ class ORBmatcher {
 
     // Matching to triangulate new MapPoints. Check Epipolar Constraint.
     int SearchForTriangulation(KeyFrame* pKF1, KeyFrame* pKF2, cv::Mat F12,
-                               std::vector<pair<size_t, size_t> >& vMatchedPairs, const bool bOnlyStereo);
+                               std::vector<pair<size_t, size_t>>& vMatchedPairs, const bool bOnlyStereo);
 
     // Search matches between MapPoints seen in KF1 and KF2 transforming by a Sim3 [s12*R12|t12]
     // In the stereo and RGB-D case, s12=1
@@ -95,8 +95,8 @@ class ORBmatcher {
 
     void ComputeThreeMaxima(std::vector<int>* histo, const int L, int& ind1, int& ind2, int& ind3);
 
-    float mfNNratio;
-    bool mbCheckOrientation;
+    float mfNNratio;          // 最佳和次佳评分的比值阈值
+    bool mbCheckOrientation;  // 检查特征点的方向
 };
 
 }  // namespace ORB_SLAM2

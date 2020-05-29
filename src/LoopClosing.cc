@@ -210,7 +210,7 @@ bool LoopClosing::ComputeSim3() {
     vector<Sim3Solver*> vpSim3Solvers;
     vpSim3Solvers.resize(nInitialCandidates);
 
-    vector<vector<MapPoint*> > vvpMapPointMatches;
+    vector<vector<MapPoint*>> vvpMapPointMatches;
     vvpMapPointMatches.resize(nInitialCandidates);
 
     vector<bool> vbDiscarded;
@@ -471,7 +471,7 @@ void LoopClosing::CorrectLoop() {
     SearchAndFuse(CorrectedSim3);
 
     // After the MapPoint fusion, new links in the covisibility graph will appear attaching both sides of the loop
-    map<KeyFrame*, set<KeyFrame*> > LoopConnections;
+    map<KeyFrame*, set<KeyFrame*>> LoopConnections;
 
     for (vector<KeyFrame*>::iterator vit = mvpCurrentConnectedKFs.begin(), vend = mvpCurrentConnectedKFs.end();
          vit != vend; vit++) {

@@ -125,7 +125,7 @@ namespace g2o {
       virtual bool updateStructure(const std::vector<HyperGraph::Vertex*>& vset, const HyperGraph::EdgeSet& edges);
       virtual bool buildSystem();
       virtual bool solve();
-      virtual bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int> >& blockIndices);
+      virtual bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int>>& blockIndices);
       virtual bool setLambda(double lambda, bool backup = false);
       virtual void restoreDiagonal();
       virtual bool supportsSchur() {return true;}
@@ -159,8 +159,8 @@ namespace g2o {
 
       LinearSolver<PoseMatrixType>* _linearSolver;
 
-      std::vector<PoseVectorType, Eigen::aligned_allocator<PoseVectorType> > _diagonalBackupPose;
-      std::vector<LandmarkVectorType, Eigen::aligned_allocator<LandmarkVectorType> > _diagonalBackupLandmark;
+      std::vector<PoseVectorType, Eigen::aligned_allocator<PoseVectorType>> _diagonalBackupPose;
+      std::vector<LandmarkVectorType, Eigen::aligned_allocator<LandmarkVectorType>> _diagonalBackupLandmark;
 
 #    ifdef G2O_OPENMP
       std::vector<OpenMPMutex> _coefficientsMutex;
@@ -177,13 +177,13 @@ namespace g2o {
 
 
   //variable size solver
-  typedef BlockSolver< BlockSolverTraits<Eigen::Dynamic, Eigen::Dynamic> > BlockSolverX;
+  typedef BlockSolver< BlockSolverTraits<Eigen::Dynamic, Eigen::Dynamic>> BlockSolverX;
   // solver for BA/3D SLAM
-  typedef BlockSolver< BlockSolverTraits<6, 3> > BlockSolver_6_3;  
+  typedef BlockSolver< BlockSolverTraits<6, 3>> BlockSolver_6_3;  
   // solver fo BA with scale
-  typedef BlockSolver< BlockSolverTraits<7, 3> > BlockSolver_7_3;  
+  typedef BlockSolver< BlockSolverTraits<7, 3>> BlockSolver_7_3;  
   // 2Dof landmarks 3Dof poses
-  typedef BlockSolver< BlockSolverTraits<3, 2> > BlockSolver_3_2;
+  typedef BlockSolver< BlockSolverTraits<3, 2>> BlockSolver_3_2;
 
 } // end namespace
 

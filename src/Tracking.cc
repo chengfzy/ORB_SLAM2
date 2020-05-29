@@ -231,26 +231,34 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat& im, const double& timestamp)
     return mCurrentFrame.mTcw.clone();
 }
 
+/**
+ * @brief Track线程
+ *
+ * @return
+ */
 void Tracking::Track() {
+    // 程序第一次运行或复位过，状态为NO_IMAGES_YET
     if (mState == NO_IMAGES_YET) {
         mState = NOT_INITIALIZED;
     }
 
+    // mLastProcessedState存储了Tracking最新的状态，用于FrameDrawer的绘制
     mLastProcessedState = mState;
 
     // Get Map Mutex -> Map cannot be changed
     unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
 
-    if (mState == NOT_INITIALIZED) {
+    if (mState == NOT_INITIALIZED) {  // 初始化
         if (mSensor == System::STEREO || mSensor == System::RGBD)
             StereoInitialization();
         else
             MonocularInitialization();
 
+        // 这一帧处理完了，更新FrameDrawer中存储的最近一份状态
         mpFrameDrawer->Update(this);
 
         if (mState != OK) return;
-    } else {
+    } else {  //跟踪
         // System is initialized. Track Frame.
         bool bOK;
 
@@ -471,25 +479,42 @@ void Tracking::StereoInitialization() {
     }
 }
 
+/**
+ * @brief 单目初始化
+ *
+ * 初始化必须连续两帧的特征点数量>100
+ *
+ * @return
+ */
 void Tracking::MonocularInitialization() {
+    // 创建Initializer
     if (!mpInitializer) {
         // Set Reference Frame
         if (mCurrentFrame.mvKeys.size() > 100) {
+            // Step 1, 选择初始化的第一帧，即参考帧
             mInitialFrame = Frame(mCurrentFrame);
             mLastFrame = Frame(mCurrentFrame);
             mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
-            for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++) mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
+            for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); ++i) {
+                mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
+            }
 
-            if (mpInitializer) delete mpInitializer;
+            // 多余代码
+            if (mpInitializer) {
+                delete mpInitializer;
+            }
 
+            // 创建Initializer, sigma = 1.0, iteration = 200
             mpInitializer = new Initializer(mCurrentFrame, 1.0, 200);
 
+            // 存储匹配点的ID，-1表示没有任何匹配
             fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
 
             return;
         }
     } else {
         // Try to initialize
+        // Step 2, 选择初始化的第二帧(当前帧)，必须连续两帧特征点个数>100才初始化
         if ((int)mCurrentFrame.mvKeys.size() <= 100) {
             delete mpInitializer;
             mpInitializer = static_cast<Initializer*>(NULL);
@@ -498,9 +523,9 @@ void Tracking::MonocularInitialization() {
         }
 
         // Find correspondences
+        // Step 3, 特征匹配，如果匹配点太少，则重新初始化
         ORBmatcher matcher(0.9, true);
         int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
-
         // Check if there are enough correspondences
         if (nmatches < 100) {
             delete mpInitializer;
@@ -512,6 +537,7 @@ void Tracking::MonocularInitialization() {
         cv::Mat tcw;                  // Current Camera Translation
         vector<bool> vbTriangulated;  // Triangulated Correspondences (mvIniMatches)
 
+        // Step 4: 通过H模型或F模型进行单目初始化，得到两帧间相对运动、初始MapPoints
         if (mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated)) {
             for (size_t i = 0, iend = mvIniMatches.size(); i < iend; i++) {
                 if (mvIniMatches[i] >= 0 && !vbTriangulated[i]) {
@@ -521,30 +547,37 @@ void Tracking::MonocularInitialization() {
             }
 
             // Set Frame Poses
-            mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+            mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));  //第一帧作为世界坐标系，因此变换矩阵为单位阵
             cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
             Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
             tcw.copyTo(Tcw.rowRange(0, 3).col(3));
             mCurrentFrame.SetPose(Tcw);
 
+            //将三角化的点包装成MapPoint
             CreateInitialMapMonocular();
         }
     }
 }
 
+/**
+ * @brief 为单目摄像头三角化得到的点生成MapPoint，使用在单目初始化过程中三角化得的点，包装成地图点，并且生成初始地图
+ *
+ * @return
+ */
 void Tracking::CreateInitialMapMonocular() {
-    // Create KeyFrames
+    // Create KeyFrames， 认为单目初始化时的参考帧和当前帧都是关键帧
     KeyFrame* pKFini = new KeyFrame(mInitialFrame, mpMap, mpKeyFrameDB);
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
 
+    // 将关键帧的描述子转为BoW
     pKFini->ComputeBoW();
     pKFcur->ComputeBoW();
 
-    // Insert KFs in the map
+    // Insert KFs in the map，凡是关键帧，都要插入地图
     mpMap->AddKeyFrame(pKFini);
     mpMap->AddKeyFrame(pKFcur);
 
-    // Create MapPoints and asscoiate to keyframes
+    // Create MapPoints and associate to keyframes
     for (size_t i = 0; i < mvIniMatches.size(); i++) {
         if (mvIniMatches[i] < 0) continue;
 
@@ -553,13 +586,17 @@ void Tracking::CreateInitialMapMonocular() {
 
         MapPoint* pMP = new MapPoint(worldPos, pKFcur, mpMap);
 
+        // KF的哪个特征点可以观测到哪个3D点
         pKFini->AddMapPoint(pMP, i);
         pKFcur->AddMapPoint(pMP, mvIniMatches[i]);
 
+        // MapPoint可以被哪个KeyFrame的哪个特征点观测到
         pMP->AddObservation(pKFini, i);
         pMP->AddObservation(pKFcur, mvIniMatches[i]);
 
+        // 从众多观测到该MapPoint的特征点挑选共视度最高的作为描述子
         pMP->ComputeDistinctiveDescriptors();
+        // 更新该MapPoint平均观测方向以及观测距离的范围
         pMP->UpdateNormalAndDepth();
 
         // Fill Current Frame structure
@@ -571,18 +608,21 @@ void Tracking::CreateInitialMapMonocular() {
     }
 
     // Update Connections
+    // 更新关键帧的连接关系，在3D点的关键帧之间建立边，每个边有一个权重，为该关键帧与当前当前帧公共3D点的个数
     pKFini->UpdateConnections();
     pKFcur->UpdateConnections();
 
     // Bundle Adjustment
+    // 全局BA
     cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
-
     Optimizer::GlobalBundleAdjustemnt(mpMap, 20);
 
     // Set median depth to 1
+    // 计算第一帧的场景深度，q=2表示场景的中值深度
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
     float invMedianDepth = 1.0f / medianDepth;
 
+    // Init成功条件： (1)第一帧中值深度要>0;　(2)第二帧被观测到的MapPoint数目应>100
     if (medianDepth < 0 || pKFcur->TrackedMapPoints(1) < 100) {
         cout << "Wrong initialization, reseting..." << endl;
         Reset();
@@ -590,6 +630,7 @@ void Tracking::CreateInitialMapMonocular() {
     }
 
     // Scale initial baseline
+    // 将两帧之间的变换归一化到中值深度为1的尺度下
     cv::Mat Tc2w = pKFcur->GetPose();
     Tc2w.col(3).rowRange(0, 3) = Tc2w.col(3).rowRange(0, 3) * invMedianDepth;
     pKFcur->SetPose(Tc2w);
@@ -612,6 +653,7 @@ void Tracking::CreateInitialMapMonocular() {
 
     mvpLocalKeyFrames.push_back(pKFcur);
     mvpLocalKeyFrames.push_back(pKFini);
+    // 初始化后，得到的初始地图中的所有点都是局部地图点
     mvpLocalMapPoints = mpMap->GetAllMapPoints();
     mpReferenceKF = pKFcur;
     mCurrentFrame.mpReferenceKF = pKFcur;
@@ -624,6 +666,7 @@ void Tracking::CreateInitialMapMonocular() {
 
     mpMap->mvpKeyFrameOrigins.push_back(pKFini);
 
+    // 初始化成功
     mState = OK;
 }
 
@@ -689,7 +732,7 @@ void Tracking::UpdateLastFrame() {
 
     // Create "visual odometry" MapPoints
     // We sort points according to their measured depth by the stereo/RGB-D sensor
-    vector<pair<float, int> > vDepthIdx;
+    vector<pair<float, int>> vDepthIdx;
     vDepthIdx.reserve(mLastFrame.keyPointNum);
     for (int i = 0; i < mLastFrame.keyPointNum; i++) {
         float z = mLastFrame.mvDepth[i];
@@ -907,7 +950,7 @@ void Tracking::CreateNewKeyFrame() {
         // We sort points by the measured depth by the stereo/RGBD sensor.
         // We create all those MapPoints whose depth < mThDepth.
         // If there are less than 100 close points we create the 100 closest.
-        vector<pair<float, int> > vDepthIdx;
+        vector<pair<float, int>> vDepthIdx;
         vDepthIdx.reserve(mCurrentFrame.keyPointNum);
         for (int i = 0; i < mCurrentFrame.keyPointNum; i++) {
             float z = mCurrentFrame.mvDepth[i];
@@ -1142,7 +1185,7 @@ bool Tracking::Relocalization() {
     vector<PnPsolver*> vpPnPsolvers;
     vpPnPsolvers.resize(nKFs);
 
-    vector<vector<MapPoint*> > vvpMapPointMatches;
+    vector<vector<MapPoint*>> vvpMapPointMatches;
     vvpMapPointMatches.resize(nKFs);
 
     vector<bool> vbDiscarded;
@@ -1257,6 +1300,11 @@ bool Tracking::Relocalization() {
     }
 }
 
+/**
+ * @brief 整个线程执行复位操作
+ *
+ * @return
+ */
 void Tracking::Reset() {
     cout << "System Reseting" << endl;
     if (mpViewer) {

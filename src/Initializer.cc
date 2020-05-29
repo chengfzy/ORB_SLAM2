@@ -37,8 +37,17 @@ Initializer::Initializer(const Frame& ReferenceFrame, float sigma, int iteration
     mMaxIterations = iterations;
 }
 
-// Computes in parallel a fundamental matrix and a homography
-// Selects a model and tries to recover the motion and the structure from motion
+/**
+ * @brief 并行地计算基础矩阵和单应性矩阵，并选择其中一个用来恢复位姿，并通过三角化得到初始两帧的3D点
+ *
+ * @param CurrentFrame
+ * @param vMatches12
+ * @param R21
+ * @param t21
+ * @param vP3D              三角化后的空间3D点
+ * @param vbTriangulated
+ * @return
+ */
 bool Initializer::Initialize(const Frame& CurrentFrame, const vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
                              vector<cv::Point3f>& vP3D, vector<bool>& vbTriangulated) {
     // Fill structures with current keypoints and matches with reference frame
@@ -68,7 +77,8 @@ bool Initializer::Initialize(const Frame& CurrentFrame, const vector<int>& vMatc
     }
 
     // Generate sets of 8 points for each RANSAC iteration
-    mvSets = vector<vector<size_t> >(mMaxIterations, vector<size_t>(8, 0));
+    // 随机选择8个点并保存到向量
+    mvSets = vector<vector<size_t>>(mMaxIterations, vector<size_t>(8, 0));
 
     DUtils::Random::SeedRandOnce(0);
 
