@@ -97,6 +97,7 @@ class Tracking {
     list<bool> mlbLost;
 
     // True if local mapping is deactivated and we are performing only localization
+    // 标记当前系统是牌SLAM状态还是纯定位状态
     bool mbOnlyTracking;
 
     void Reset();

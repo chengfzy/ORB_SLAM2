@@ -257,27 +257,32 @@ void Tracking::Track() {
         // 这一帧处理完了，更新FrameDrawer中存储的最近一份状态
         mpFrameDrawer->Update(this);
 
+        // mState在上一步被更新
         if (mState != OK) return;
     } else {  //跟踪
         // System is initialized. Track Frame.
         bool bOK;
 
         // Initial camera pose estimation using motion model or relocalization (if tracking is lost)
-        if (!mbOnlyTracking) {
+        // mbOnlyTracking为false表示正常VO模式(SLAM模式, 有地图更新), mbOnlyTracking为true表示定位模式
+        if (!mbOnlyTracking) {  // SLAM模式
             // Local Mapping is activated. This is the normal behaviour, unless
             // you explicitly activate the "only tracking" mode.
 
-            if (mState == OK) {
+            if (mState == OK) {  // 上一帧正常
                 // Local Mapping might have changed some MapPoints tracked in last frame
+                // 由于Tracking需要使用上一帧的信息，而LocalMapping线程可能会对原有的地图点进行替换，这里进行检查并重设MapPoint点
                 CheckReplacedInLastFrame();
 
                 if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2) {
+                    // 运动模型为空，或刚完成重定位，则根据关键帧来跟踪
                     bOK = TrackReferenceKeyFrame();
                 } else {
                     bOK = TrackWithMotionModel();
                     if (!bOK) bOK = TrackReferenceKeyFrame();
                 }
             } else {
+                // 上一步出错,只能重定位了
                 bOK = Relocalization();
             }
         } else {
@@ -670,35 +675,56 @@ void Tracking::CreateInitialMapMonocular() {
     mState = OK;
 }
 
+/**
+ * @brief 检查上一帧中的MapPoint是否被替换
+ *
+ * Local Mapping线程可能会将关键帧中某些MapPoint进行替换，由于tracking中需要用到mLastFrame,
+ * 这里检查并更新上一帧被替换的MapPoints
+ *
+ * @see LocalMapping::SearchInNeighbors()
+ *
+ * @return
+ */
 void Tracking::CheckReplacedInLastFrame() {
     for (int i = 0; i < mLastFrame.keyPointNum; i++) {
         MapPoint* pMP = mLastFrame.mvpMapPoints[i];
 
+        // 如果这个地图点存在
         if (pMP) {
+            // 获取其是否被替换，以及替换后的点
             MapPoint* pRep = pMP->GetReplaced();
             if (pRep) {
+                // 重设一下
                 mLastFrame.mvpMapPoints[i] = pRep;
             }
         }
     }
 }
 
+/**
+ * @brief 根据关键帧来跟踪
+ *
+ * @return
+ */
 bool Tracking::TrackReferenceKeyFrame() {
     // Compute Bag of Words vector
+    // 获取当前帧描述子的BoW
     mCurrentFrame.ComputeBoW();
 
     // We perform first an ORB matching with the reference keyframe
     // If enough matches are found we setup a PnP solver
-    ORBmatcher matcher(0.7, true);
+    ORBmatcher matcher(0.7, true);  // 0.7为匹配的阈值
     vector<MapPoint*> vpMapPointMatches;
 
+    // 通过特征的BoW加速当前帧与参考帧之间的特征匹配，匹配数量>15再进行下一步
     int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
 
     if (nmatches < 15) return false;
 
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
-    mCurrentFrame.SetPose(mLastFrame.mTcw);
+    mCurrentFrame.SetPose(mLastFrame.mTcw);  // 将上帧的位姿作为当前帧位姿的初始值
 
+    // 通过优化3D-2D重投影误差来调整位姿
     Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
@@ -708,16 +734,21 @@ bool Tracking::TrackReferenceKeyFrame() {
             if (mCurrentFrame.mvbOutlier[i]) {
                 MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
 
+                // 异常点为空
                 mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
                 mCurrentFrame.mvbOutlier[i] = false;
+                // 没有被跟踪到
                 pMP->mbTrackInView = false;
+                // 最后一个观测到该点的帧序号
                 pMP->mnLastFrameSeen = mCurrentFrame.mnId;
                 nmatches--;
             } else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
+                // 被观测到的次数>0，该观测次数只有在关键帧插入的时候才计数
                 nmatchesMap++;
         }
     }
 
+    // 当前帧中的10个以后的点被观测到，才算跟踪成功
     return nmatchesMap >= 10;
 }
 

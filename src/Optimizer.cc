@@ -339,13 +339,16 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
         }
     }
 
+    // 如果没有足够的匹配点，直接放弃
     if (nInitialCorrespondences < 3) return 0;
 
     // We perform 4 optimizations, after each optimization we classify observation as inlier/outlier
     // At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
-    const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991};
-    const float chi2Stereo[4] = {7.815, 7.815, 7.815, 7.815};
-    const int its[4] = {10, 10, 10, 10};
+    // 开始优化，总共优化4次，每次优化迭代10次，将观测分为outlier和inlier，outlier不参与下次优化。
+    // 基于卡方检验计算出的阈值(假设测量有一个像素的偏差)
+    const float chi2Mono[4] = {5.991, 5.991, 5.991, 5.991};    // 单目
+    const float chi2Stereo[4] = {7.815, 7.815, 7.815, 7.815};  // 双目
+    const int its[4] = {10, 10, 10, 10};                       // 4次迭代，每次迭代的次数
 
     int nBad = 0;
     for (size_t it = 0; it < 4; it++) {
@@ -404,11 +407,13 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
     }
 
     // Recover optimized pose and return number of inliers
+    // 得到优化后的当前帧的位姿
     g2o::VertexSE3Expmap* vSE3_recov = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(0));
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
     cv::Mat pose = Converter::toCvMat(SE3quat_recov);
     pFrame->SetPose(pose);
 
+    // 返回内点数目
     return nInitialCorrespondences - nBad;
 }
 
