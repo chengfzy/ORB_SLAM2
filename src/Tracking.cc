@@ -278,19 +278,26 @@ void Tracking::Track() {
                     // 运动模型为空，或刚完成重定位，则根据关键帧来跟踪
                     bOK = TrackReferenceKeyFrame();
                 } else {
+                    // 根据运动模型进行跟踪
                     bOK = TrackWithMotionModel();
-                    if (!bOK) bOK = TrackReferenceKeyFrame();
+                    // 运动模型失败,则根据关键帧来跟踪
+                    if (!bOK) {
+                        bOK = TrackReferenceKeyFrame();
+                    }
                 }
             } else {
                 // 上一步出错,只能重定位了
                 bOK = Relocalization();
             }
-        } else {
+        } else {  // 定位模式
             // Localization Mode: Local Mapping is deactivated
 
             if (mState == LOST) {
+                // 跟丢了, 只能重定位了
                 bOK = Relocalization();
             } else {
+                // mbVO为false表示匹配了很多的MapPoints，跟踪正常
+                // mbVO为true表示此帧匹配了很少的MapPoints(<10)，要跪的节奏
                 if (!mbVO) {
                     // In last frame we tracked enough MapPoints in the map
 
@@ -305,20 +312,25 @@ void Tracking::Track() {
                     // We compute two camera poses, one from motion model and one doing relocalization.
                     // If relocalization is sucessfull we choose that solution, otherwise we retain
                     // the "visual odometry" solution.
+                    // mbVO为true表示些帧匹配了很少的3D点，少于10个，要跪的节奏，既做跟踪又做定位
 
-                    bool bOKMM = false;
-                    bool bOKReloc = false;
-                    vector<MapPoint*> vpMPsMM;
-                    vector<bool> vbOutMM;
+                    bool bOKMM = false;         // 通过motion model跟踪的结果
+                    bool bOKReloc = false;      // 通过重定位方法跟踪的结果
+                    vector<MapPoint*> vpMPsMM;  // 运动模型的地图点
+                    vector<bool> vbOutMM;       // 运动模型后发现的外点
                     cv::Mat TcwMM;
                     if (!mVelocity.empty()) {
+                        // 运动模型非空，根据运动模型来计算位姿
                         bOKMM = TrackWithMotionModel();
                         vpMPsMM = mCurrentFrame.mvpMapPoints;
                         vbOutMM = mCurrentFrame.mvbOutlier;
                         TcwMM = mCurrentFrame.mTcw.clone();
                     }
+
+                    // 使用重定位方法来得到当前帧的位姿
                     bOKReloc = Relocalization();
 
+                    // 重定位没成功，跟踪成功
                     if (bOKMM && !bOKReloc) {
                         mCurrentFrame.SetPose(TcwMM);
                         mCurrentFrame.mvpMapPoints = vpMPsMM;
@@ -327,19 +339,22 @@ void Tracking::Track() {
                         if (mbVO) {
                             for (int i = 0; i < mCurrentFrame.keyPointNum; i++) {
                                 if (mCurrentFrame.mvpMapPoints[i] && !mCurrentFrame.mvbOutlier[i]) {
+                                    // 增加被观测次数
                                     mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
                                 }
                             }
                         }
                     } else if (bOKReloc) {
+                        // 只要重定位成功，整个跟踪过程正常进行。定位与跟踪，更相信重定位
                         mbVO = false;
                     }
 
-                    bOK = bOKReloc || bOKMM;
+                    bOK = bOKReloc || bOKMM;  // 有一个成功，就认为执行成功了
                 }
             }
         }
 
+        // 将最新的关键帧作为参考帧
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
         // If we have an initial estimation of the camera pose and matching. Track the local map.
@@ -352,12 +367,14 @@ void Tracking::Track() {
             if (bOK && !mbVO) bOK = TrackLocalMap();
         }
 
+        // 判断是否跟踪成功
         if (bOK)
             mState = OK;
         else
             mState = LOST;
 
         // Update drawer
+        // 更新显示
         mpFrameDrawer->Update(this);
 
         // If tracking were good, check if we insert a keyframe
@@ -367,6 +384,7 @@ void Tracking::Track() {
                 cv::Mat LastTwc = cv::Mat::eye(4, 4, CV_32F);
                 mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
                 mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
+                // T_CCl = T_CW *Ｔ_WCl, C为当前帧，Cl为上一帧
                 mVelocity = mCurrentFrame.mTcw * LastTwc;
             } else
                 mVelocity = cv::Mat();
@@ -718,8 +736,9 @@ bool Tracking::TrackReferenceKeyFrame() {
 
     // 通过特征的BoW加速当前帧与参考帧之间的特征匹配，匹配数量>15再进行下一步
     int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
-
-    if (nmatches < 15) return false;
+    if (nmatches < 15) {
+        return false;
+    }
 
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw);  // 将上帧的位姿作为当前帧位姿的初始值
@@ -743,7 +762,7 @@ bool Tracking::TrackReferenceKeyFrame() {
                 pMP->mnLastFrameSeen = mCurrentFrame.mnId;
                 nmatches--;
             } else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
-                // 被观测到的次数>0，该观测次数只有在关键帧插入的时候才计数
+                // 累计成功匹配到的地图点数目，被观测到的次数>0
                 nmatchesMap++;
         }
     }
@@ -752,13 +771,19 @@ bool Tracking::TrackReferenceKeyFrame() {
     return nmatchesMap >= 10;
 }
 
+/**
+ * @brief 双目或RGBD相机根据深度值为上一帧产生新的MapPoints
+ *
+ * 对于单目，只计算上一帧位姿
+ */
 void Tracking::UpdateLastFrame() {
     // Update pose according to reference keyframe
     KeyFrame* pRef = mLastFrame.mpReferenceKF;
     cv::Mat Tlr = mlRelativeFramePoses.back();
-
+    // 上一帧在世界坐标系下的位姿: T_lw = T_lr * T_rw. l: last, r: reference
     mLastFrame.SetPose(Tlr * pRef->GetPose());
 
+    // 如果上一帧为关键帧, 或者是单目情况, 则退出
     if (mnLastKeyFrameId == mLastFrame.mnId || mSensor == System::MONOCULAR || !mbOnlyTracking) return;
 
     // Create "visual odometry" MapPoints
@@ -807,37 +832,57 @@ void Tracking::UpdateLastFrame() {
     }
 }
 
+/**
+ * @brief 根据匀速运动模型对上一帧的MapPoint进行跟踪
+ *
+ * 1. 如果单目，计算上一帧相对于世界坐标系的位姿。双目和RGBD暂未了解
+ * 2. 根据运动关系估计当前帧的位姿
+ * 3. 将上一帧的MapPoints投影到当前帧的图像平面上, 在投影的位置一定区域内匹配(加快匹配速度)
+ * 4. 位姿优化
+ * 5. 根据姿态剔除外点(误匹配)
+ *
+ * @return
+ */
 bool Tracking::TrackWithMotionModel() {
     ORBmatcher matcher(0.9, true);
 
     // Update last frame pose according to its reference keyframe
     // Create "visual odometry" points if in Localization Mode
+    // 对于单目, 只计算上一帧相对于世界坐标系的位姿
     UpdateLastFrame();
 
+    // 认为两帧之间的相对运动和之前两帧之间的运动相同, 从而估计当前帧的位姿, T_CW = T_CCl * T_ClW, C为当前帧，Cl为上一帧
     mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
-
+    // 清空当前帧的地图点
     fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), static_cast<MapPoint*>(NULL));
 
     // Project points seen in previous frame
+    // 阈值, 即匹配过程中的搜索半径
     int th;
     if (mSensor != System::STEREO)
         th = 15;
     else
         th = 7;
+    // 根据匀速模型对上帧的MapPoint进行跟踪，根据上一帧特征点对应的3D点投影位置缩小特征点匹配范围
     int nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, th, mSensor == System::MONOCULAR);
 
     // If few matches, uses a wider window search
+    // 如果跟踪点少，则扩大搜索半径再来一次
     if (nmatches < 20) {
         fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), static_cast<MapPoint*>(NULL));
         nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, 2 * th, mSensor == System::MONOCULAR);
     }
-
-    if (nmatches < 20) return false;
+    // 如果还找不到足够的跟踪点, 则认为运动跟踪失败
+    if (nmatches < 20) {
+        return false;
+    }
 
     // Optimize frame pose with all matches
+    // 优化位姿
     Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
+    // 剔除位姿优化后的outerlier，和前面TrackReferenceKeyFrame()类似
     int nmatchesMap = 0;
     for (int i = 0; i < mCurrentFrame.keyPointNum; i++) {
         if (mCurrentFrame.mvpMapPoints[i]) {
@@ -850,11 +895,13 @@ bool Tracking::TrackWithMotionModel() {
                 pMP->mnLastFrameSeen = mCurrentFrame.mnId;
                 nmatches--;
             } else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
+                // 累计成功匹配到的地图点数目
                 nmatchesMap++;
         }
     }
 
     if (mbOnlyTracking) {
+        // 如果在纯定位模式时中追踪的地图点非常少，那么这里的mbVO标记会置位
         mbVO = nmatchesMap < 10;
         return nmatches > 20;
     }
@@ -862,6 +909,11 @@ bool Tracking::TrackWithMotionModel() {
     return nmatchesMap >= 10;
 }
 
+/**
+ * @brief 对Local Map的MapPoints进行跟踪
+ *
+ * @return
+ */
 bool Tracking::TrackLocalMap() {
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
@@ -1197,14 +1249,22 @@ void Tracking::UpdateLocalKeyFrames() {
     }
 }
 
+/**
+ * @brief 重定位
+ *
+ * @return
+ */
 bool Tracking::Relocalization() {
     // Compute Bag of Words Vector
+    // 计算当前帧特征点的BoW
     mCurrentFrame.ComputeBoW();
 
     // Relocalization is performed when tracking is lost
-    // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
+    // Track Lost: Query KeyFrame Database for keyframe candidates for relocalization
+    // 找到与当前帧相似的候选关键帧
     vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame);
 
+    // 没有找到，退出
     if (vpCandidateKFs.empty()) return false;
 
     const int nKFs = vpCandidateKFs.size();
@@ -1212,28 +1272,31 @@ bool Tracking::Relocalization() {
     // We perform first an ORB matching with each candidate
     // If enough matches are found we setup a PnP solver
     ORBmatcher matcher(0.75, true);
-
+    // 每个关键帧的PnP求解器
     vector<PnPsolver*> vpPnPsolvers;
     vpPnPsolvers.resize(nKFs);
-
+    // 每个关键帧和当前帧特征点的匹配关系
     vector<vector<MapPoint*>> vvpMapPointMatches;
     vvpMapPointMatches.resize(nKFs);
-
+    // 放弃某个关键帧的标记
     vector<bool> vbDiscarded;
     vbDiscarded.resize(nKFs);
 
-    int nCandidates = 0;
-
+    int nCandidates = 0;  // 有效的候选关键帧
+    // 遍历所有的候选关键帧，确定出满足要求的关键帧并为其创建PnP求解器
     for (int i = 0; i < nKFs; i++) {
         KeyFrame* pKF = vpCandidateKFs[i];
         if (pKF->isBad())
             vbDiscarded[i] = true;
         else {
+            // 通过BoW进行匹配
             int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
+            // 匹配数小于15, 放弃这个关键帧
             if (nmatches < 15) {
                 vbDiscarded[i] = true;
                 continue;
             } else {
+                // 初始化PnP solver
                 PnPsolver* pSolver = new PnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
                 pSolver->SetRansacParameters(0.99, 10, 300, 4, 0.5, 5.991);
                 vpPnPsolvers[i] = pSolver;
@@ -1244,7 +1307,7 @@ bool Tracking::Relocalization() {
 
     // Alternatively perform some iterations of P4P RANSAC
     // Until we found a camera pose supported by enough inliers
-    bool bMatch = false;
+    bool bMatch = false;  // 是否已经找到相匹配的关键帧
     ORBmatcher matcher2(0.9, true);
 
     while (nCandidates > 0 && !bMatch) {
@@ -1252,14 +1315,15 @@ bool Tracking::Relocalization() {
             if (vbDiscarded[i]) continue;
 
             // Perform 5 Ransac Iterations
-            vector<bool> vbInliers;
-            int nInliers;
-            bool bNoMore;
+            vector<bool> vbInliers;  // 内点标记
+            int nInliers;            // 内点数
+            bool bNoMore;  // 表示RANSAC已经没有更多的迭代次数可用，也就是说数据不够好，RANSAC也已经尽力了
 
             PnPsolver* pSolver = vpPnPsolvers[i];
             cv::Mat Tcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers);
 
-            // If Ransac reachs max. iterations discard keyframe
+            // If Ransac reaches max. iterations discard keyframe
+            // RANSAC迭代已经尽力了
             if (bNoMore) {
                 vbDiscarded[i] = true;
                 nCandidates--;
@@ -1269,10 +1333,11 @@ bool Tracking::Relocalization() {
             if (!Tcw.empty()) {
                 Tcw.copyTo(mCurrentFrame.mTcw);
 
+                // 成功被两次找到的地图点的集合，其实就是经过RANSAC之后的内点
                 set<MapPoint*> sFound;
 
                 const int np = vbInliers.size();
-
+                // 遍历所有内点
                 for (int j = 0; j < np; j++) {
                     if (vbInliers[j]) {
                         mCurrentFrame.mvpMapPoints[j] = vvpMapPointMatches[i][j];
@@ -1281,17 +1346,24 @@ bool Tracking::Relocalization() {
                         mCurrentFrame.mvpMapPoints[j] = NULL;
                 }
 
+                // 通过PoseOptimization进行优化求解，只优化位姿，不优化地图点，返回内点数量
                 int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
-
+                // 如果优化后的内点数目不够多，直接跳过本次循环
                 if (nGood < 10) continue;
 
-                for (int io = 0; io < mCurrentFrame.keyPointNum; io++)
-                    if (mCurrentFrame.mvbOutlier[io]) mCurrentFrame.mvpMapPoints[io] = static_cast<MapPoint*>(NULL);
+                // 删除外点对应的地图点
+                for (int io = 0; io < mCurrentFrame.keyPointNum; io++) {
+                    if (mCurrentFrame.mvbOutlier[io]) {
+                        mCurrentFrame.mvpMapPoints[io] = static_cast<MapPoint*>(NULL);
+                    }
+                }
 
                 // If few inliers, search by projection in a coarse window and optimize again
+                // 如果内点较少，通过投影的方式对之前未匹配的点进行匹配，再进行优化求解
                 if (nGood < 50) {
                     int nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 10, 100);
 
+                    // 如果通过投影方式获得了比较多的特征点
                     if (nadditional + nGood >= 50) {
                         nGood = Optimizer::PoseOptimization(&mCurrentFrame);
 
@@ -1315,6 +1387,7 @@ bool Tracking::Relocalization() {
                 }
 
                 // If the pose is supported by enough inliers stop ransacs and continue
+                // 如果当前关键帧已经有足够的内点了，那么就认为当前关键帧和当前帧匹配上了
                 if (nGood >= 50) {
                     bMatch = true;
                     break;
@@ -1326,6 +1399,7 @@ bool Tracking::Relocalization() {
     if (!bMatch) {
         return false;
     } else {
+        // 如果匹配上了，说明重定位成功，记录下当前帧的ID
         mnLastRelocFrameId = mCurrentFrame.mnId;
         return true;
     }

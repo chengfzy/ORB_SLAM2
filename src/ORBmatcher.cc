@@ -238,6 +238,19 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame& F, vector<MapPoint*>& vpMapPoi
     return nmatches;
 }
 
+/**
+ * @brief 通过投影, 对上一帧的特征点进行跟踪
+ *
+ * 1. 将一帧的MapPoints投影到当前帧(根据速度模型可以估计当前帧的位姿T_CW)
+ * 2. 在投影点附近根据描述子距离选取匹配，以及最终的方向。
+ *
+ * @param pKF
+ * @param Scw
+ * @param vpPoints
+ * @param vpMatched
+ * @param th
+ * @return
+ */
 int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapPoint*>& vpPoints,
                                    vector<MapPoint*>& vpMatched, int th) {
     // Get Calibration Parameters for later projection
@@ -1120,6 +1133,20 @@ int ORBmatcher::SearchBySim3(KeyFrame* pKF1, KeyFrame* pKF2, vector<MapPoint*>& 
     return nFound;
 }
 
+/**
+ * @brief 通过投影，对上一帧的特征点进行跟踪
+ *
+ * 上一帧包含了MapPoints，对这些MapPoints进行tracking，由此增加当前帧的MapPoint
+ *  1. 将上一帧的MapPoints投影到当前帧(根据速度模型可以估计当前帧的T_CW)
+ *  2. 在投影点附近根据描述子距离选取匹配，以及最终的方向投票机制进行剔除
+ *
+ * @param CurrentFrame  当前帧
+ * @param LastFrame     上一帧
+ * @param th            搜索阈值
+ * @param bMono         是否为单目
+ * @return  成功匹配的数量
+ * @see SearchByBow()
+ */
 int ORBmatcher::SearchByProjection(Frame& CurrentFrame, const Frame& LastFrame, const float th, const bool bMono) {
     int nmatches = 0;
 

@@ -163,6 +163,12 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
     return vpLoopCandidates;
 }
 
+/**
+ * @brief 在重定位中找到与该帧相似的关键帧
+ *
+ * @param F
+ * @return
+ */
 vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* F) {
     list<KeyFrame*> lKFsSharingWords;
 

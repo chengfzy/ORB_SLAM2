@@ -134,6 +134,8 @@ class Tracking {
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
     // In that case we are doing visual odometry. The system will try to do relocalization to recover
     // "zero-drift" localization to the map.
+    // 当进行纯定位时会有的一个变量, 为false表示该帧匹配了很多的地图点, 跟踪是正常的. 如果小于10个则为true,
+    // 表示快完蛋了, 系统会尝试重定位
     bool mbVO;
 
     // Other Thread Pointers
@@ -193,7 +195,7 @@ class Tracking {
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
 
-    // Motion Model
+    // Motion Model，即当前帧与上一帧之前的位姿关系。T_CCl = T_CW *Ｔ_WCl, C为当前帧，Cl为上一帧。可以设为空
     cv::Mat mVelocity;
 
     // Color order (true RGB, false BGR, ignored if grayscale)
