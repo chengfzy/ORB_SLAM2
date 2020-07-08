@@ -153,10 +153,10 @@ class Tracking {
     // Initialization (only for monocular)
     Initializer* mpInitializer;
 
-    // Local Map
-    KeyFrame* mpReferenceKF;
-    std::vector<KeyFrame*> mvpLocalKeyFrames;
-    std::vector<MapPoint*> mvpLocalMapPoints;
+    // Local Map, 局部地图相关
+    KeyFrame* mpReferenceKF;                   // 参考关键帧，当前关键帧就是参考帧
+    std::vector<KeyFrame*> mvpLocalKeyFrames;  // 局部关键帧集合
+    std::vector<MapPoint*> mvpLocalMapPoints;  // 局部地图点集合
 
     // System
     System* mpSystem;

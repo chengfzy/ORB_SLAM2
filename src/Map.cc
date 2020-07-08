@@ -52,6 +52,13 @@ void Map::EraseKeyFrame(KeyFrame* pKF) {
     // Delete the MapPoint
 }
 
+/**
+ * @brief 设置参考MapPoints，用于DrawMapPoints函数绘图
+ * 其实可以看出，这里的参考地图点实际在地图中是一个相对独立的部分
+ *
+ * @param vpMPs
+ * @return
+ */
 void Map::SetReferenceMapPoints(const vector<MapPoint*>& vpMPs) {
     unique_lock<mutex> lock(mMutexMap);
     mvpReferenceMapPoints = vpMPs;
